@@ -1,0 +1,89 @@
+{
+  "skill_name": "trace-debugger",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我的 Python 程序抛出了 KeyError，但我确定键存在，帮我看看是什么原因",
+      "expected_output": "分析 KeyError 的可能原因，提供排查思路和解决方案",
+      "files": [],
+      "assertions": [
+        {
+          "name": "包含埋点步骤",
+          "description": "输出应提到添加埋点或日志",
+          "type": "contains",
+          "target": "埋点"
+        },
+        {
+          "name": "包含分析步骤",
+          "description": "输出应提到分析日志或查看数据",
+          "type": "contains",
+          "target": "分析"
+        },
+        {
+          "name": "不直接修复",
+          "description": "不应建议直接修改代码而不先收集数据",
+          "type": "not_contains",
+          "target": "直接修复"
+        },
+        {
+          "name": "提到清理步骤",
+          "description": "应提到调试完成后需要清理埋点",
+          "type": "contains",
+          "target": "清理"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "这段代码在并发环境下偶尔会出现数据不一致的问题，帮我调试一下",
+      "expected_output": "分析并发问题，找出竞态条件，提供修复建议",
+      "files": [],
+      "assertions": [
+        {
+          "name": "包含埋点步骤",
+          "description": "输出应提到添加埋点或日志",
+          "type": "contains",
+          "target": "埋点"
+        },
+        {
+          "name": "包含分析步骤",
+          "description": "输出应提到分析日志或查看数据",
+          "type": "contains",
+          "target": "分析"
+        },
+        {
+          "name": "提到三步法",
+          "description": "应提到三步调试法或埋点-分析-修复流程",
+          "type": "contains",
+          "target": "三步"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "API 响应时间有时候很慢，怎么找出性能瓶颈？",
+      "expected_output": "提供性能分析方法和工具建议，帮助定位慢查询或耗时操作",
+      "files": [],
+      "assertions": [
+        {
+          "name": "包含埋点步骤",
+          "description": "输出应提到添加埋点或日志",
+          "type": "contains",
+          "target": "埋点"
+        },
+        {
+          "name": "包含性能指标",
+          "description": "应提到时间戳、耗时测量等性能相关指标",
+          "type": "contains",
+          "target": "时间"
+        },
+        {
+          "name": "提到清理步骤",
+          "description": "应提到调试完成后需要清理埋点",
+          "type": "contains",
+          "target": "清理"
+        }
+      ]
+    }
+  ]
+}
