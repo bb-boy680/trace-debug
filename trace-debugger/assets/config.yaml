@@ -1,9 +1,3 @@
-# Debugger Skill 配置示例
-
-# 日志服务端口（前端项目使用）
-port: 9229
-
-# 前端项目目录匹配模式（支持 glob）
 frontend:
   - "**/frontend/**"
   - "**/web/**"
@@ -19,15 +13,3 @@ backend:
   - "**/*.py"
   - "**/*.java"
   - "**/*.go"
-
-# 排除扫描的文件
-exclude:
-  - .git
-  - .vscode
-  - .idea
-  - node_modules
-  - dist
-  - build
-  - coverage
-  - .DS_Store
-  - *.log

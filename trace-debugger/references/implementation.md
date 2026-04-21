@@ -22,7 +22,7 @@ fetch('http://localhost:{{DEBUG_PORT}}/debug/log?session_id={{DEBUG_SESSION_ID}}
     message: '[位置:描述]',
     data: { /* 变量快照 */ }
   })
-}).catch(() => {});
+});
 // #endregion DEBUG
 ```
 
@@ -30,23 +30,31 @@ fetch('http://localhost:{{DEBUG_PORT}}/debug/log?session_id={{DEBUG_SESSION_ID}}
 
 ## 后端埋点（文件写入）
 
-**日志路径使用绝对路径**：`{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log`
+**日志路径使用绝对路径**：`{{$(pwd)}}/.debug/logs/{{DEBUG_SESSION_ID}}.log`
 
 ### Node.js
 
 **ES Modules**（`.mjs` 或 `package.json` 有 `"type": "module"`）：
 ```javascript
 // #region DEBUG [sessionId: {{DEBUG_SESSION_ID}}, port: {{DEBUG_PORT}}]
-import('fs').then(fs => fs.appendFileSync('{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log',
-  JSON.stringify({ location: '文件名:行号', message: '[位置:描述]', data: {}, timestamp: Date.now() }) + '\n'
-)).catch(() => {});
+import("fs").then((fs) =>
+  fs.appendFileSync(
+    `$(pwd)/.debug/logs/{{DEBUG_SESSION_ID}}.log`,
+    JSON.stringify({
+      location: "文件名:行号",
+      message: "[位置:描述]",
+      data: {},
+      timestamp: Date.now(),
+    }) + "\n",
+  )
+);
 // #endregion DEBUG
 ```
 
 **CommonJS**（`.js` 或 `package.json` 无 `"type": "module"`）：
 ```javascript
 // #region DEBUG [sessionId: {{DEBUG_SESSION_ID}}, port: {{DEBUG_PORT}}]
-require('fs').appendFileSync('{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log',
+require('fs').appendFileSync('{{$(pwd)}}/.debug/logs/{{DEBUG_SESSION_ID}}.log',
   JSON.stringify({ location: `${__filename}:行号`, message: '[位置:描述]', data: {}, timestamp: Date.now() }) + '\n'
 );
 // #endregion DEBUG
@@ -57,7 +65,7 @@ require('fs').appendFileSync('{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}
 ```python
 # #region DEBUG [sessionId: {{DEBUG_SESSION_ID}}, port: {{DEBUG_PORT}}]
 import json, time
-with open('{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log', 'a', encoding='utf-8') as f:
+with open('{{$(pwd)}}/.debug/logs/{{DEBUG_SESSION_ID}}.log', 'a', encoding='utf-8') as f:
     f.write(json.dumps({'location': f'{__file__}:行号', 'message': '[位置:描述]', 'data': {}, 'timestamp': time.time()}) + '\n')
 # #endregion DEBUG
 ```
@@ -66,7 +74,7 @@ with open('{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log', 'a', encodin
 
 ```go
 // #region DEBUG [sessionId: {{DEBUG_SESSION_ID}}, port: {{DEBUG_PORT}}]
-f, _ := os.OpenFile("{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+f, _ := os.OpenFile("{{$(pwd)}}/.debug/logs/{{DEBUG_SESSION_ID}}.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 json.NewEncoder(f).Encode(map[string]interface{}{"location": "文件名.go:行号", "message": "[位置:描述]", "data": {}, "timestamp": time.Now().UnixMilli()})
 f.Close()
 // #endregion DEBUG
@@ -76,7 +84,7 @@ f.Close()
 
 ```java
 // #region DEBUG [sessionId: {{DEBUG_SESSION_ID}}, port: {{DEBUG_PORT}}]
-try { java.nio.file.Files.writeString(java.nio.file.Paths.get("{{$(pwd)}}/.worker/debug/logs/{{DEBUG_SESSION_ID}}.log"),
+try { java.nio.file.Files.writeString(java.nio.file.Paths.get("{{$(pwd)}}/.debug/logs/{{DEBUG_SESSION_ID}}.log"),
   String.format("{\"location\":\"%s:%d\",\"message\":\"%s\",\"data\":{},\"timestamp\":%d}%n", "文件名.java", 10, "[位置:描述]", System.currentTimeMillis()),
   java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
 } catch (Exception e) {}

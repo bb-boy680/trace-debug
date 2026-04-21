@@ -1,220 +1,214 @@
-#!/usr/bin/env node
-
 /**
- * Debugger Skill Hook - 启动日志收集服务 (Node.js 版本)
- *
- * 触发时机：skill 激活时自动启动
- * 功能：接收前端埋点日志并写入 .worker/debug/logs/{sessionId}.log
+ * Debugger Server - 接收前端埋点 POST 请求并写入日志文件
+ * 目录结构：.debug/logs/{sessionId}.log
+ * 端口策略：从 9220 开始自动检测，被占用则 +1 递增
  */
 
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
-const net = require("net");
+import http from "http";
+import path from "path";
+import fs from "fs";
 
-// 路径配置
 const ROOT_DIR = process.cwd();
-const DEBUG_DIR = path.join(ROOT_DIR, ".worker", "debug");
-const CONFIG_PATH = path.join(DEBUG_DIR, "config.yaml");
-const LOGS_DIR = path.join(ROOT_DIR, ".worker", "debug", "logs");
-
-let PORT = 9229;
-try {
-  const content = fs.readFileSync(CONFIG_PATH, "utf-8");
-  const match = content.match(/^port:\s*(\d+)/m);
-  if (match) {
-    PORT = parseInt(match[1], 10);
-  }
-} catch (err) {
-  console.error(`[debugger-hook] Error reading config: ${err.message}`);
-}
+const DEBUG_DIR = path.join(ROOT_DIR, ".debug");
+const LOGS_DIR = path.join(ROOT_DIR, ".debug", "logs");
 
 /**
- * 检查端口是否可用
+ * 查找可用端口：从 startPort 开始递增，直到找到未被占用的端口
  */
-function checkPortAvailable(port) {
-  return new Promise((resolve) => {
-    const tester = net
-      .createServer()
-      .once("error", (err) => {
-        if (err.code === "EADDRINUSE") {
-          resolve(false);
+function findAvailablePort(startPort, maxAttempts = 20) {
+  return new Promise((resolve, reject) => {
+    let currentPort = startPort;
+    let attempts = 0;
+
+    function tryPort(port) {
+      if (attempts >= maxAttempts) {
+        reject(
+          new Error(`找不到可用端口（尝试了 ${startPort}-${startPort + maxAttempts - 1}）`)
+        );
+        return;
+      }
+      attempts++;
+
+      const server = http.createServer();
+      server.listen(port, () => {
+        server.close();
+        resolve(port);
+      });
+      server.on("error", (err) => {
+        if (err.code === "EADDRINUSE" || err.code === "EACCES") {
+          tryPort(port + 1);
         } else {
-          resolve(false);
+          reject(err);
         }
-      })
-      .once("listening", () => {
-        tester.close(() => resolve(true));
-      })
-      .listen(port);
+      });
+    }
+
+    tryPort(currentPort);
   });
 }
 
 /**
- * 确保目录存在
+ * 解析请求体
  */
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk.toString()));
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error("Invalid JSON"));
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 /**
- * 解析日志数据中的关键信息
+ * 安全提取嵌套属性
  */
-function parseLogInfo(body) {
+function get(obj, path, defaultValue = null) {
+  return path.split(".").reduce((acc, key) => acc?.[key], obj) ?? defaultValue;
+}
+
+/**
+ * 获取客户端 IP
+ */
+function getClientIp(req) {
+  return (
+    get(req, "headers.x-forwarded-for", "")?.split(",")[0] ||
+    get(req, "socket.remoteAddress", "unknown")
+  );
+}
+
+/**
+ * 将日志条目追加到对应 session 的日志文件
+ */
+function appendLog(sessionId, logEntry) {
+  if (!LOGS_DIR) return;
+  const logFile = path.join(LOGS_DIR, `${sessionId}.log`);
+  fs.appendFileSync(logFile, JSON.stringify(logEntry) + "\n");
+}
+
+/**
+ * 路由：接收埋点日志
+ */
+async function handleLogRequest(req, res) {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const sessionId = url.searchParams.get("session_id");
+  const clientIp = getClientIp(req);
+
+  if (!sessionId) {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ error: "Missing session_id parameter" }));
+  }
+
   try {
-    const data = JSON.parse(body);
-    return {
-      file: data.file || "",
-      line: data.line || "",
-      func: data.func || "",
+    const logData = await parseBody(req);
+    const timestamp = logData.timestamp || Date.now();
+
+    const logEntry = {
+      timestamp,
+      level: get(logData, "level", "info"),
+      session: sessionId,
+      service: get(logData, "service", "debugger-log"),
+      client_ip: clientIp,
+      user_agent: get(req, "headers.user-agent", ""),
+      file: get(logData, "location", get(logData, "file", "")),
+      line: get(logData, "line", 0),
+      message: get(logData, "message", ""),
+      data: get(logData, "data", {}),
+      raw: logData,
     };
-  } catch {
-    // 尝试正则提取
-    const fileMatch = body.match(/"file"\s*:\s*"([^"]+)"/);
-    const lineMatch = body.match(/"line"\s*:\s*(\d+)/);
-    const funcMatch = body.match(/"func"\s*:\s*"([^"]+)"/);
 
-    return {
-      file: fileMatch ? fileMatch[1] : "",
-      line: lineMatch ? lineMatch[1] : "",
-      func: funcMatch ? funcMatch[1] : "",
-    };
-  }
-}
+    appendLog(sessionId, logEntry);
 
-// 主函数
-async function main() {
-  // 确保日志目录存在
-  ensureDir(LOGS_DIR);
-
-  // 创建 HTTP 服务器
-  const server = http.createServer((req, res) => {
-    // 设置 CORS 头
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-    // 处理预检请求
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    const { pathname } = new URL(req.url, `http://localhost:${PORT}`);
-
-    // 路由处理
-    switch (pathname) {
-      case "/health":
-        handleHealth(req, res);
-        break;
-      case "/debug/log":
-        handleLog(req, res);
-        break;
-      default:
-        res.writeHead(404);
-        res.end("not found");
-    }
-  });
-
-  // 健康检查端点
-  function handleHealth(req, res) {
-    if (req.method !== "GET") {
-      res.writeHead(405);
-      res.end();
-      return;
+    // 终端打印关键埋点
+    const info = logEntry;
+    if (info.file) {
+      console.log(`[debugger:${sessionId}] ${info.file}:${info.line} ${info.message}`);
     }
 
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        status: "ok",
-        service: "debugger-log",
-      }),
-    );
+    res.end(JSON.stringify({ status: "logged" }));
+  } catch (err) {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: `Bad request: ${err.message}` }));
   }
-
-  // 日志接收端点
-  function handleLog(req, res) {
-    if (req.method !== "POST") {
-      res.writeHead(405);
-      res.end();
-      return;
-    }
-
-    const { searchParams } = new URL(req.url, `http://localhost:${PORT}`);
-    const sessionId = searchParams.get("session_id") || "default";
-    const logFile = path.join(LOGS_DIR, `${sessionId}.log`);
-
-    let body = "";
-
-    req.on("data", (chunk) => {
-      body += chunk.toString();
-    });
-
-    req.on("end", () => {
-      if (body) {
-        // 写入日志文件
-        fs.appendFileSync(logFile, body + "\n");
-
-        // 解析并输出关键信息到控制台
-        const info = parseLogInfo(body);
-        if (info.file) {
-          console.log(`[debugger:${sessionId}] ${info.file}:${info.line} ${info.func}`);
-        }
-      }
-
-      res.writeHead(200);
-      res.end("ok");
-    });
-
-    req.on("error", (err) => {
-      console.error(`[debugger-hook] Request error: ${err.message}`);
-      res.writeHead(500);
-      res.end("error");
-    });
-  }
-
-  // 启动服务器
-  server.listen(PORT, () => {
-    console.log(`[debugger-hook] Server started on port ${PORT}`);
-  });
-
-  // 处理服务器错误（如端口被占用）
-  server.on("error", (err) => {
-    process.exit(1);
-  });
-
-  // 优雅退出处理
-  function shutdown() {
-    console.log("\n[debugger-hook] Shutting down...");
-    server.close(() => {
-      process.exit(0);
-    });
-
-    // 强制退出超时
-    setTimeout(() => {
-      console.error("[debugger-hook] Forced shutdown");
-      process.exit(1);
-    }, 5000);
-  }
-
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-  process.on("SIGUSR2", shutdown); // nodemon 重启信号
 }
 
+/**
+ * 健康检查
+ */
+function handleHealthCheck(res) {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ status: "ok", service: "debugger-log" }));
+}
 
-checkPortAvailable(PORT)
-  .then(async () => {
-    await main().catch((err) => {
-      console.error(`[debugger-hook] Server error: ${err.message}`);
-      process.exit(1);
+/**
+ * 请求路由分发
+ */
+async function routeRequest(req, res) {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathname = url.pathname;
+
+    switch (pathname) {
+      case "/health":
+        return handleHealthCheck(res);
+      case "/debug/log":
+        return await handleLogRequest(req, res);
+      default:
+        res.writeHead(404, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: `Not found: ${pathname}` }));
+    }
+  } catch (err) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: `Internal error: ${err.message}` }));
+  }
+}
+
+// 启动服务器
+const DEFAULT_PORT = 9220;
+
+async function start() {
+  // 确保日志目录存在
+  if (!fs.existsSync(LOGS_DIR)) {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
+  }
+
+  const port = await findAvailablePort(DEFAULT_PORT);
+  const server = http.createServer(routeRequest);
+
+  // 优雅关闭
+  function shutdown(signal) {
+    console.log(`\n[debugger] ${signal} received, shutting down...`);
+    server.close(() => {
+      console.log("[debugger] HTTP server closed");
+      process.exit(0);
     });
-  })
-  .catch((err) => {
-    console.error(`[debugger-hook] Fatal error: ${err.message}`);
-    process.exit(1);
+    // 强制退出
+    setTimeout(() => {
+      console.error("[debugger] Forced shutdown");
+      process.exit(1);
+    }, 3000);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
+  server.on("error", (err) => {
+    console.error(`[debugger] Server error: ${err.message}`);
   });
+
+  server.listen(port, () => {
+    console.log(`[debugger] Server started on port ${port}`);
+    console.log(`[debugger] Logs directory: ${LOGS_DIR}`);
+  });
+}
+
+start().catch((err) => {
+  console.error(`[debugger] Fatal error: ${err.message}`);
+  process.exit(1);
+});
