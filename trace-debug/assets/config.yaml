@@ -1,0 +1,16 @@
+# Backend project directory matching patterns (support glob)
+backend:
+  - "**/backend/**"
+  - "**/api/**"
+  - "**/server/**"
+  - "**/*.py"
+  - "**/*.java"
+  - "**/*.go"
+
+# Frontend project directory matching patterns (support glob)
+frontend:
+  - "**/frontend/**"
+  - "**/web/**"
+  - "**/ui/**"
+  - "**/src/**/*.tsx"
+  - "**/src/**/*.vue"

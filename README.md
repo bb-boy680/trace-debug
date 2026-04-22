@@ -1,4 +1,6 @@
-# Trace Debugger Skill
+# Trace Debug Skill
+
+[中文文档](README-zh.md) | English
 
 A debugging skill for Claude Code that helps you find and fix bugs through "trace -> analyze -> cleanup".
 
@@ -7,7 +9,7 @@ A debugging skill for Claude Code that helps you find and fix bugs through "trac
 ### Install
 
 ```bash
-npx skills add https://github.com/bb-boy680/trace-debugger --skill trace-debugger
+npx skills add https://github.com/bb-boy680/trace-debug --skill trace-debug
 ```
 
 ### Run
@@ -15,7 +17,7 @@ npx skills add https://github.com/bb-boy680/trace-debugger --skill trace-debugge
 When you encounter a bug, just say:
 
 ```
-use trace-debugger to help me fix this bug
+use trace-debug to help me fix this bug
 ```
 
 Or mention keywords like:

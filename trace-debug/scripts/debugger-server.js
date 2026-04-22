@@ -1,7 +1,7 @@
 /**
- * Debugger Server - 接收前端埋点 POST 请求并写入日志文件
- * 目录结构：.debug/logs/{sessionId}.log
- * 端口策略：从 9220 开始自动检测，被占用则 +1 递增
+ * Debugger Server - Receives frontend instrumentation POST requests and writes to log files
+ * Directory structure: .debug/logs/{sessionId}.log
+ * Port strategy: Auto-detect starting from 9220, increment +1 if occupied
  */
 
 import http from "http";
@@ -13,7 +13,7 @@ const DEBUG_DIR = path.join(ROOT_DIR, ".debug");
 const LOGS_DIR = path.join(ROOT_DIR, ".debug", "logs");
 
 /**
- * 查找可用端口：从 startPort 开始递增，直到找到未被占用的端口
+ * Find available port: Increment from startPort until finding an unoccupied port
  */
 function findAvailablePort(startPort, maxAttempts = 20) {
   return new Promise((resolve, reject) => {
@@ -23,7 +23,7 @@ function findAvailablePort(startPort, maxAttempts = 20) {
     function tryPort(port) {
       if (attempts >= maxAttempts) {
         reject(
-          new Error(`找不到可用端口（尝试了 ${startPort}-${startPort + maxAttempts - 1}）`)
+          new Error(`No available port found (tried ${startPort}-${startPort + maxAttempts - 1})`)
         );
         return;
       }
@@ -48,7 +48,7 @@ function findAvailablePort(startPort, maxAttempts = 20) {
 }
 
 /**
- * 解析请求体
+ * Parse request body
  */
 function parseBody(req) {
   return new Promise((resolve, reject) => {
@@ -66,14 +66,14 @@ function parseBody(req) {
 }
 
 /**
- * 安全提取嵌套属性
+ * Safely extract nested properties
  */
 function get(obj, path, defaultValue = null) {
   return path.split(".").reduce((acc, key) => acc?.[key], obj) ?? defaultValue;
 }
 
 /**
- * 获取客户端 IP
+ * Get client IP
  */
 function getClientIp(req) {
   return (
@@ -83,7 +83,7 @@ function getClientIp(req) {
 }
 
 /**
- * 将日志条目追加到对应 session 的日志文件
+ * Append log entry to the corresponding session's log file
  */
 function appendLog(sessionId, logEntry) {
   if (!LOGS_DIR) return;
@@ -92,9 +92,26 @@ function appendLog(sessionId, logEntry) {
 }
 
 /**
- * 路由：接收埋点日志
+ * Set CORS headers for cross-origin requests
+ */
+function setCorsHeaders(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+/**
+ * Route: Receive instrumentation logs
  */
 async function handleLogRequest(req, res) {
+  setCorsHeaders(res);
+
+  // Handle OPTIONS preflight request
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    return res.end();
+  }
+
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sessionId = url.searchParams.get("session_id");
   const clientIp = getClientIp(req);
@@ -124,7 +141,7 @@ async function handleLogRequest(req, res) {
 
     appendLog(sessionId, logEntry);
 
-    // 终端打印关键埋点
+    // Print key instrumentation to terminal
     const info = logEntry;
     if (info.file) {
       console.log(`[debugger:${sessionId}] ${info.file}:${info.line} ${info.message}`);
@@ -139,15 +156,16 @@ async function handleLogRequest(req, res) {
 }
 
 /**
- * 健康检查
+ * Health check
  */
 function handleHealthCheck(res) {
+  setCorsHeaders(res);
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ status: "ok", service: "debugger-log" }));
 }
 
 /**
- * 请求路由分发
+ * Request routing
  */
 async function routeRequest(req, res) {
   try {
@@ -160,20 +178,22 @@ async function routeRequest(req, res) {
       case "/debug/log":
         return await handleLogRequest(req, res);
       default:
+        setCorsHeaders(res);
         res.writeHead(404, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ error: `Not found: ${pathname}` }));
     }
   } catch (err) {
+    setCorsHeaders(res);
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: `Internal error: ${err.message}` }));
   }
 }
 
-// 启动服务器
+// Start server
 const DEFAULT_PORT = 9220;
 
 async function start() {
-  // 确保日志目录存在
+  // Ensure log directory exists
   if (!fs.existsSync(LOGS_DIR)) {
     fs.mkdirSync(LOGS_DIR, { recursive: true });
   }
@@ -181,14 +201,14 @@ async function start() {
   const port = await findAvailablePort(DEFAULT_PORT);
   const server = http.createServer(routeRequest);
 
-  // 优雅关闭
+  // Graceful shutdown
   function shutdown(signal) {
     console.log(`\n[debugger] ${signal} received, shutting down...`);
     server.close(() => {
       console.log("[debugger] HTTP server closed");
       process.exit(0);
     });
-    // 强制退出
+    // Force exit
     setTimeout(() => {
       console.error("[debugger] Forced shutdown");
       process.exit(1);

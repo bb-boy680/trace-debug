@@ -1,5 +1,5 @@
 ---
-name: trace-debugger
+name: trace-debug
 description: 代码调试助手，通过"埋点 -> 分析修复 -> 清理"定位并修复 bug。埋点规则：前端用 HTTP fetch，后端用文件写入，禁用 console.log。触发场景：用户提到 bug、error、异常、调试、代码不工作、测试失败等。
 ---
 
@@ -30,7 +30,7 @@ description: 代码调试助手，通过"埋点 -> 分析修复 -> 清理"定位
 **立即执行以下命令**，获取真实的 `DEBUG_SESSION_ID`：
 
 ```bash
-DEBUG_SESSION_ID=$(node "$(pwd)/.claude/skills/trace-debugger/scripts/generate-session-id.js")
+DEBUG_SESSION_ID=$(node "scripts/generate-session-id.js")
 echo "SESSION_ID: $DEBUG_SESSION_ID"
 ```
 
@@ -42,7 +42,7 @@ echo "SESSION_ID: $DEBUG_SESSION_ID"
 **使用 Bash 工具并设置 `run_in_background: true`**，启动 debugger-server：
 
 ```bash
-node "$(pwd)/.claude/skills/trace-debugger/scripts/debugger-server.js"
+node "scripts/debugger-server.js"
 ```
 
 **重要**：调用 Bash 工具时必须设置 `run_in_background: true` 参数，确保服务器在后台持续运行。

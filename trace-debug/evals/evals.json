@@ -1,0 +1,89 @@
+{
+  "skill_name": "trace-debug",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My Python program is throwing a KeyError, but I'm certain the key exists. Help me figure out what's causing this.",
+      "expected_output": "Analyze possible causes of KeyError, provide troubleshooting approach and solutions",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Contains instrumentation step",
+          "description": "Output should mention adding instrumentation or logs",
+          "type": "contains",
+          "target": "instrumentation"
+        },
+        {
+          "name": "Contains analysis step",
+          "description": "Output should mention analyzing logs or viewing data",
+          "type": "contains",
+          "target": "analyze"
+        },
+        {
+          "name": "No direct fix",
+          "description": "Should not suggest directly modifying code without first collecting data",
+          "type": "not_contains",
+          "target": "direct fix"
+        },
+        {
+          "name": "Mentions cleanup step",
+          "description": "Should mention that instrumentation needs to be cleaned up after debugging is complete",
+          "type": "contains",
+          "target": "cleanup"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "This code occasionally has data inconsistency issues in concurrent environments. Help me debug it.",
+      "expected_output": "Analyze concurrency issues, find race conditions, provide fix suggestions",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Contains instrumentation step",
+          "description": "Output should mention adding instrumentation or logs",
+          "type": "contains",
+          "target": "instrumentation"
+        },
+        {
+          "name": "Contains analysis step",
+          "description": "Output should mention analyzing logs or viewing data",
+          "type": "contains",
+          "target": "analyze"
+        },
+        {
+          "name": "Mentions three-step method",
+          "description": "Should mention three-step debugging method or instrumentation-analyze-fix workflow",
+          "type": "contains",
+          "target": "three-step"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "API response times are sometimes slow. How do I find the performance bottleneck?",
+      "expected_output": "Provide performance analysis methods and tool suggestions to help locate slow queries or time-consuming operations",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Contains instrumentation step",
+          "description": "Output should mention adding instrumentation or logs",
+          "type": "contains",
+          "target": "instrumentation"
+        },
+        {
+          "name": "Contains performance metrics",
+          "description": "Should mention timestamps, time measurement and other performance-related metrics",
+          "type": "contains",
+          "target": "time"
+        },
+        {
+          "name": "Mentions cleanup step",
+          "description": "Should mention that instrumentation needs to be cleaned up after debugging is complete",
+          "type": "contains",
+          "target": "cleanup"
+        }
+      ]
+    }
+  ]
+}
