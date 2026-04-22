@@ -1,6 +1,6 @@
 ---
 name: trace-debug
-description: Code debugging assistant that uses "Instrument -> Analyze & Fix -> Cleanup" workflow to locate and fix bugs. Instrumentation rules: frontend uses HTTP fetch, backend uses file writes, console.log is prohibited. Trigger scenarios: user mentions bug, error, exception, debugging, code not working, test failing, etc.
+description: "Code debugging assistant that uses 'Instrument -> Analyze & Fix -> Cleanup' workflow to locate and fix bugs. Instrumentation rules: frontend uses HTTP fetch, backend uses file writes, console.log is prohibited. Trigger scenarios: user mentions bug, error, exception, debugging, code not working, test failing, etc."
 ---
 
 <system>
